@@ -44,7 +44,7 @@ VERIFY_PRE_CONF=$(abspath $(SCRIPTDIR)/__tools__/verify-pre-conf.sh)
 CLEAN=$(abspath $(SCRIPTDIR)/__tools__/clean.sh)
 TESTSCRIPT=$(abspath $(SCRIPTDIR)/__tools__/run-tests.sh)
 
-PY_VERSION=${shell python3 --version | sed 's/Python \(3\.[0-9]\).*/\1/'}
+PY_VERSION=${shell python3.8 --version | sed 's/Python \(3\.[0-9]\).*/\1/'}
 PYTHON_DIR=$(DSTDIR)/lib/python$(PY_VERSION)/site-packages/
 
 ifndef NO_SGX_RUN_DURING_BUILD
@@ -71,7 +71,7 @@ clean-build : $(PYTHON_DIR)
 environment : $(DSTDIR) $(PYTHON_DIR)
 
 $(PYTHON_DIR) :
-	virtualenv -p python3 --no-download $(DSTDIR)
+	virtualenv -p python3.8 --no-download $(DSTDIR)
 	. $(abspath $(DSTDIR)/bin/activate) ; pip install --upgrade pip
 	. $(abspath $(DSTDIR)/bin/activate) ; pip install --upgrade setuptools
 	. $(abspath $(DSTDIR)/bin/activate) ; pip install --upgrade toml

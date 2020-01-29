@@ -15,9 +15,9 @@
 # limitations under the License.
 
 
-PY3_VERSION=$(python --version | sed 's/Python 3\.\([0-9]\).*/\1/')
+PY3_VERSION=$(python3.8 --version | sed 's/Python 3\.\([0-9]\).*/\1/')
 if [[ $PY3_VERSION -lt 5 ]]; then
-    echo activate python3 first
+    echo activate python3.8 first
     exit 101
 fi
 
