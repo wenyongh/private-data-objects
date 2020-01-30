@@ -138,7 +138,7 @@ void WawakaInterpreter::load_contract_code(
     pe::ThrowIfNull(wasm_module_inst, "failed to instantiate the module");
 
     /* this would allow specific stack size, just use the default for now */
-    wasm_exec_env = wasm_runtime_create_exec_env(1024 * 64);
+    wasm_exec_env = wasm_runtime_create_exec_env(wasm_module_inst, 1024 * 64);
     pe::ThrowIfNull(wasm_exec_env, "failed to create the wasm execution environment");
 }
 
@@ -162,7 +162,7 @@ int32 WawakaInterpreter::initialize_contract(
     memcpy(buffer, env.c_str(), env.length());
     buffer[env.length()] = '\0';
 
-    if (! wasm_runtime_call_wasm(wasm_module_inst, wasm_exec_env, wasm_func, 1, argv)) {
+    if (! wasm_runtime_call_wasm(wasm_exec_env, wasm_func, 1, argv)) {
         SAFE_LOG(PDO_LOG_ERROR, "execution failed for some reason");
 
         const char *exception = wasm_runtime_get_exception(wasm_module_inst);
@@ -204,7 +204,7 @@ int32 WawakaInterpreter::evaluate_function(
     memcpy(buffer, env.c_str(), env.length());
     buffer[env.length()] = '\0';
 
-    if (! wasm_runtime_call_wasm(wasm_module_inst, wasm_exec_env, wasm_func, 2, argv)) {
+    if (! wasm_runtime_call_wasm(wasm_exec_env, wasm_func, 2, argv)) {
         SAFE_LOG(PDO_LOG_ERROR, "execution failed for some reason");
 
         const char *exception = wasm_runtime_get_exception(wasm_module_inst);
