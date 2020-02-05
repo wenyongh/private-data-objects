@@ -46,7 +46,8 @@ source ./emsdk_env.sh
 
 If wawaka is configured as the contract interpreter, the libraries implementing the WASM interpreter
 will be built for use with Intel SGX. The source for the WAMR interpreter is
-included as a submodule in the interpreters/ folder.
+included as a submodule in the interpreters/ folder. The WAMR API is built during the Wawaka build, so
+no additional build steps are required to set up WAMR.
 
 ### Set the environment variables ###
 
@@ -80,5 +81,3 @@ pdo-test-contract --no-ledger --interpreter wawaka --contract mock-contract \
 ## Basics of a Contract ##
 
 Note that compilation into WASM that will run in the contract enclave can be somewhat tricky. Specifically, all symbols whether used or not must be bound. The wawaka interpreter will fail if it attempts to load WASM code with unbound symbols.
-
-It may be easiest to copy the
