@@ -135,7 +135,6 @@ add_library (${IWASM_STATIC_NAME}
              ${UTILS_SHARED_SOURCE}
              ${LIBC_BUILTIN_SOURCE}
              ${LIBC_WASI_SOURCE}
-	     ${WASM_SRC}/product-mini/platforms/linux-sgx/ext_lib_export.c
              ${IWASM_COMMON_SOURCE}
              ${IWASM_INTERP_SOURCE}
              ${IWASM_AOT_SOURCE}

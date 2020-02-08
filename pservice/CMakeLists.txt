@@ -65,7 +65,8 @@ SET(SGX_INCLUDE "${SGX_SDK}/include")
 SET(SGX_SSL_INCLUDE "${SGX_SSL}/include")
 SET(SGX_ENCLAVE_INCLUDE "${SGX_SDK}/include"
                         "${SGX_SDK}/include/tlibc"
-                        "${SGX_SDK}/include/libcxx")
+                        "${SGX_SDK}/include/libcxx"
+                        "${SGX_SSL}/include")
 
 SET(SGX_LIBS_TRUSTED_NAMES sgx_tstdc sgx_tstdcxx sgx_tcrypto)
 SET(SGX_LIBS_UNTRUSTED_NAMES )

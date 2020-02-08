@@ -41,12 +41,13 @@ namespace pstate = pdo::state;
  * NAME: _key_value_set_wrapper
  * ----------------------------------------------------------------- */
 extern "C" bool key_value_set_wrapper(
-    wasm_module_inst_t module_inst,
+    wasm_exec_env_t exec_env,
     const int32 key_buffer_offset, // uint8_t*
     const int32 key_buffer_length, // size_t
     const int32 val_buffer_offset, // uint8_t*
     const int32 val_buffer_length) // size_t
 {
+    wasm_module_inst_t module_inst = wasm_runtime_get_module_inst(exec_env);
     try {
         pstate::Basic_KV_Plus* state = (pstate::Basic_KV_Plus*)wasm_runtime_get_custom_data(module_inst);
         if (state == NULL)
@@ -83,12 +84,13 @@ extern "C" bool key_value_set_wrapper(
  * NAME: _key_value_get_wrapper
  * ----------------------------------------------------------------- */
 extern "C" bool key_value_get_wrapper(
-    wasm_module_inst_t module_inst,
+    wasm_exec_env_t exec_env,
     const int32 key_buffer_offset, // uint8_t*
     const int32 key_buffer_length, // size_t
     int32 val_buffer_pointer_offset, // uint8_t**
     int32 val_length_pointer_offset) // size_t*
 {
+    wasm_module_inst_t module_inst = wasm_runtime_get_module_inst(exec_env);
     try {
         pstate::Basic_KV_Plus* state = (pstate::Basic_KV_Plus*)wasm_runtime_get_custom_data(module_inst);
         if (state == NULL)

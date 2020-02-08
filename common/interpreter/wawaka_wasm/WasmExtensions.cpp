@@ -41,10 +41,11 @@ namespace pe = pdo::error;
  * NAME: _contract_log_wrapper
  * ----------------------------------------------------------------- */
 extern "C" bool contract_log_wrapper(
-    wasm_module_inst_t module_inst,
+    wasm_exec_env_t exec_env,
     const int32 loglevel,
     const int32 buffer_offset)
 {
+    wasm_module_inst_t module_inst = wasm_runtime_get_module_inst(exec_env);
     try {
         if (! wasm_runtime_validate_app_addr(module_inst, buffer_offset, 0))
         {
@@ -67,10 +68,11 @@ extern "C" bool contract_log_wrapper(
  * NAME: simple_hash
  * ----------------------------------------------------------------- */
 extern "C" int simple_hash_wrapper(
-    wasm_module_inst_t module_inst,
+    wasm_exec_env_t exec_env,
     int32 buffer_offset,
     const int32 buffer_length)
 {
+    wasm_module_inst_t module_inst = wasm_runtime_get_module_inst(exec_env);
     try {
         uint8_t *buffer = (uint8_t*)get_buffer(module_inst, buffer_offset, buffer_length);
         if (buffer == NULL)
@@ -96,11 +98,12 @@ extern "C" int simple_hash_wrapper(
  * NAME: memchr
  * ----------------------------------------------------------------- */
 extern "C" int32 memchr_wrapper(
-    wasm_module_inst_t module_inst,
+    wasm_exec_env_t exec_env,
     int32 src_offset,
     int32 ch,
     uint32 src_size)
 {
+    wasm_module_inst_t module_inst = wasm_runtime_get_module_inst(exec_env);
     try {
         if (src_size == 0)
             return 0;
@@ -125,10 +128,11 @@ extern "C" int32 memchr_wrapper(
  * NAME: strtod
  * ----------------------------------------------------------------- */
 extern "C" double strtod_wrapper(
-    wasm_module_inst_t module_inst,
+    wasm_exec_env_t exec_env,
     int32 src_offset,
     int32 endptr_offset)
 {
+    wasm_module_inst_t module_inst = wasm_runtime_get_module_inst(exec_env);
     try {
         /* could figure out the minimum length */
         if (! wasm_runtime_validate_app_addr(module_inst, src_offset, 1))
@@ -162,10 +166,11 @@ extern "C" double strtod_wrapper(
  * NAME: strstr
  * ----------------------------------------------------------------- */
 extern "C" int32 strstr_wrapper(
-    wasm_module_inst_t module_inst,
+    wasm_exec_env_t exec_env,
     int32 haystack_offset,
     int32 needle_offset)
 {
+    wasm_module_inst_t module_inst = wasm_runtime_get_module_inst(exec_env);
     try {
         /* could figure out the minimum length */
         if (! wasm_runtime_validate_app_addr(module_inst, haystack_offset, 1))

@@ -155,8 +155,12 @@ int32 WawakaInterpreter::initialize_contract(
     pe::ThrowIfNull(wasm_func, "Unable to locate the initialize function");
 
     // might need to add a null terminator
-    uint32 argv[1];
-    argv[0] = (int32)wasm_runtime_module_malloc(wasm_module_inst, env.length() + 1);
+    uint32 argv[1], buf_offset;
+    argv[0] = buf_offset = (int32)wasm_runtime_module_malloc(wasm_module_inst, env.length() + 1);
+    if (argv[0] == 0) {
+        SAFE_LOG(PDO_LOG_ERROR, "module malloc failed for some reason");
+        return 0;
+    }
 
     buffer = (char*)wasm_runtime_addr_app_to_native(wasm_module_inst, argv[0]);
     memcpy(buffer, env.c_str(), env.length());
@@ -171,6 +175,8 @@ int32 WawakaInterpreter::initialize_contract(
 
         return 0;
     }
+
+    wasm_runtime_module_free(wasm_module_inst, buf_offset);
 
     SAFE_LOG(PDO_LOG_DEBUG, "RESULT=%u", argv[0]);
     return argv[0];
@@ -192,9 +198,19 @@ int32 WawakaInterpreter::evaluate_function(
     pe::ThrowIfNull(wasm_func, "Unable to locate the dispatch function");
 
     // might need to add a null terminator
-    uint32 argv[2];
-    argv[0] = (int32)wasm_runtime_module_malloc(wasm_module_inst, args.length() + 1);
-    argv[1] = (int32)wasm_runtime_module_malloc(wasm_module_inst, env.length() + 1);
+    uint32 argv[2], buf_offset0, buf_offset1;
+
+    argv[0] = buf_offset0 = (int32)wasm_runtime_module_malloc(wasm_module_inst, args.length() + 1);
+    if (argv[0] == 0) {
+        SAFE_LOG(PDO_LOG_ERROR, "module malloc failed for some reason");
+        return 0;
+    }
+
+    argv[1] = buf_offset1 = (int32)wasm_runtime_module_malloc(wasm_module_inst, env.length() + 1);
+    if (argv[1] == 0) {
+        SAFE_LOG(PDO_LOG_ERROR, "module malloc failed for some reason");
+        return 0;
+    }
 
     buffer = (char*)wasm_runtime_addr_app_to_native(wasm_module_inst, argv[0]);
     memcpy(buffer, args.c_str(), args.length());
@@ -213,6 +229,9 @@ int32 WawakaInterpreter::evaluate_function(
 
         return 0;
     }
+
+    wasm_runtime_module_free(wasm_module_inst, buf_offset0);
+    wasm_runtime_module_free(wasm_module_inst, buf_offset1);
 
     SAFE_LOG(PDO_LOG_DEBUG, "RESULT=%u", argv[0]);
     return argv[0];
