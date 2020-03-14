@@ -105,9 +105,11 @@ pdo-test-contract --no-ledger --interpreter wawaka --contract mock-contract \
 
 By default, wawaka will be built for interpreted wasm contracts.
 If you would like to enable
-ahead-of-time (AoT) compiled wasm contracts, set the environment variable `WASM_MODE` (default: `INTERP`):
+ahead-of-time (AoT) compiled wasm contracts, set the environment variables
+`PDO_INTERPRETER` and `WASM_MODE`:
 
 ```bash
+export PDO_INTERPRETER=wawaka-aot
 export WASM_MODE=AOT
 ```
 

@@ -3,4 +3,4 @@ docker/validator-keys
 docker/sgx
 make.log
 cscope.files
-cscope.out
+cscope*.out

@@ -60,7 +60,8 @@ var_set() {
 		PDO_INTERPRETER contains the name of the interpreter to use
                 for processing contracts. 'gipsy' is the default and is the Scheme-based,
                 functional language. 'wawaka' is an experimental interpreter that executes
-                WASM-based contracts.
+                WASM-based contracts. 'wawaka-aot' is a WASM runtime that
+                executes ahead-of-time compiled WASM contracts.
 	"
 	env_key_sort[$i]="PDO_INTERPRETER"; i=$i+1; export PDO_INTERPRETER=${env_val[PDO_INTERPRETER]};
 
