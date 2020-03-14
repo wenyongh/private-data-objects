@@ -40,6 +40,10 @@ install : build
 	@cd build; make install
 
 build :
+	@echo Installing LLVM dependencies for wamrc
+	cd $(WASM_SRC)/wamr-compiler && ./build_llvm.sh
+	@echo Building wamrc
+	cd $(WASM_SRC)/wamr-compiler && mkdir -p $@ && cd $@ ; cmake .. && make
 	mkdir $@
 	cd $@ ; emcmake cmake ..
 

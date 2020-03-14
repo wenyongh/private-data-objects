@@ -19,6 +19,7 @@
 #include <exception>
 #include <string>
 #include <map>
+#include <errno.h>
 
 #include "packages/base64/base64.h"
 #include "packages/parson/parson.h"
@@ -133,7 +134,7 @@ void WawakaInterpreter::load_contract_code(
     SAFE_LOG(PDO_LOG_DEBUG, "initialize the wasm interpreter");
     wasm_module = wasm_runtime_load((uint8*)binary_code.data(), binary_code.size(), error_buf, sizeof(error_buf));
     if (wasm_module == NULL)
-        SAFE_LOG(PDO_LOG_CRITICAL, "load failed with error <%s>", error_buf);
+        SAFE_LOG(PDO_LOG_CRITICAL, "load failed with error <%s> (errno %d)", error_buf, errno);
 
     pe::ThrowIfNull(wasm_module, "module load failed");
 
