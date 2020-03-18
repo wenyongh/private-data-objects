@@ -19,6 +19,7 @@
 #include <exception>
 #include <string>
 #include <map>
+#include <errno.h>
 
 #include "packages/base64/base64.h"
 #include "packages/parson/parson.h"
@@ -36,6 +37,9 @@
 namespace pc = pdo::contracts;
 namespace pe = pdo::error;
 namespace pstate = pdo::state;
+
+// Should be defined in WasmExtensions.cpp
+extern bool RegisterNativeFunctions(void);
 
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
@@ -106,7 +110,7 @@ void WawakaInterpreter::parse_response_string(
     pc::parse_invocation_response(result, outResponse, status, outStateChanged, outDependencies);
     pe::ThrowIf<pe::ValueError>(
         ! status,
-        report_interpreter_error("operation failed", outResponse.c_str()));
+        report_interpreter_error("method evaluation failed", outResponse.c_str()));
 }
 
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
@@ -130,7 +134,7 @@ void WawakaInterpreter::load_contract_code(
     SAFE_LOG(PDO_LOG_DEBUG, "initialize the wasm interpreter");
     wasm_module = wasm_runtime_load((uint8*)binary_code.data(), binary_code.size(), error_buf, sizeof(error_buf));
     if (wasm_module == NULL)
-        SAFE_LOG(PDO_LOG_CRITICAL, "load failed with error <%s>", error_buf);
+        SAFE_LOG(PDO_LOG_CRITICAL, "load failed with error <%s> (errno %d)", error_buf, errno);
 
     pe::ThrowIfNull(wasm_module, "module load failed");
 
@@ -147,7 +151,7 @@ void WawakaInterpreter::load_contract_code(
 int32 WawakaInterpreter::initialize_contract(
     const std::string& env)
 {
-    char *buffer;
+    uint8_t* buffer;
     wasm_function_inst_t wasm_func = NULL;
 
     SAFE_LOG(PDO_LOG_DEBUG, "wasm initialize_contract");
@@ -156,13 +160,12 @@ int32 WawakaInterpreter::initialize_contract(
 
     // might need to add a null terminator
     uint32 argv[1], buf_offset;
-    argv[0] = buf_offset = (int32)wasm_runtime_module_malloc(wasm_module_inst, env.length() + 1);
+    argv[0] = buf_offset = (int32)wasm_runtime_module_malloc(wasm_module_inst, env.length() + 1, (void**)&buffer);
     if (argv[0] == 0) {
         SAFE_LOG(PDO_LOG_ERROR, "module malloc failed for some reason");
         return 0;
     }
 
-    buffer = (char*)wasm_runtime_addr_app_to_native(wasm_module_inst, argv[0]);
     memcpy(buffer, env.c_str(), env.length());
     buffer[env.length()] = '\0';
 
@@ -188,7 +191,7 @@ int32 WawakaInterpreter::evaluate_function(
     const std::string& args,
     const std::string& env)
 {
-    char *buffer;
+    uint8_t* buffer;
     wasm_function_inst_t wasm_func = NULL;
 
     SAFE_LOG(PDO_LOG_DEBUG, "evalute_function");
@@ -200,23 +203,21 @@ int32 WawakaInterpreter::evaluate_function(
     // might need to add a null terminator
     uint32 argv[2], buf_offset0, buf_offset1;
 
-    argv[0] = buf_offset0 = (int32)wasm_runtime_module_malloc(wasm_module_inst, args.length() + 1);
+    argv[0] = buf_offset0 = (int32)wasm_runtime_module_malloc(wasm_module_inst, args.length() + 1, (void**)&buffer);
     if (argv[0] == 0) {
         SAFE_LOG(PDO_LOG_ERROR, "module malloc failed for some reason");
         return 0;
     }
 
-    argv[1] = buf_offset1 = (int32)wasm_runtime_module_malloc(wasm_module_inst, env.length() + 1);
+    memcpy(buffer, args.c_str(), args.length());
+    buffer[args.length()] = '\0';
+
+    argv[1] = buf_offset1 = (int32)wasm_runtime_module_malloc(wasm_module_inst, env.length() + 1, (void**)&buffer);
     if (argv[1] == 0) {
         SAFE_LOG(PDO_LOG_ERROR, "module malloc failed for some reason");
         return 0;
     }
 
-    buffer = (char*)wasm_runtime_addr_app_to_native(wasm_module_inst, argv[0]);
-    memcpy(buffer, args.c_str(), args.length());
-    buffer[args.length()] = '\0';
-
-    buffer = (char*)wasm_runtime_addr_app_to_native(wasm_module_inst, argv[1]);
     memcpy(buffer, env.c_str(), env.length());
     buffer[env.length()] = '\0';
 
@@ -282,6 +283,9 @@ void WawakaInterpreter::Initialize(void)
     pe::ThrowIf<pe::RuntimeError>(result != 0, "failed to initialize wasm interpreter memory ppol");
 
     wasm_runtime_init();
+
+    bool registered = RegisterNativeFunctions();
+    pe::ThrowIf<pe::RuntimeError>(! registered, "failed to register native functions");
 }
 
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
