@@ -23,9 +23,9 @@ source ${SRCDIR}/bin/lib/common.sh
 
 # -----------------------------------------------------------------
 # -----------------------------------------------------------------
-PY3_VERSION=$(python3.8 --version | sed 's/Python 3\.\([0-9]\).*/\1/')
+PY3_VERSION=$(python --version | sed 's/Python 3\.\([0-9]\).*/\1/')
 if [[ $PY3_VERSION -lt 5 ]]; then
-    die activate python3.8 first
+    die activate python3 first
 fi
 
 # Automatically determine how many cores the host system has
@@ -45,13 +45,11 @@ yell --------------- COMMON ---------------
 
 # now build the rest of common
 cd $SRCDIR/common
-cp CMakeLists.txt.sgx CMakeLists.txt
 
 mkdir -p build
 cd build
 try cmake ${CMAKE_ARGS} ..
 try make "-j$NUM_CORES"
-rm CMakeLists.txt
 
 yell --------------- BIN ---------------
 cd $SRCDIR/bin
