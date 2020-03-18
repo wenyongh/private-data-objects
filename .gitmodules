@@ -1,3 +1,0 @@
-[submodule "interpreters/wasm-micro-runtime"]
-	path = interpreters/wasm-micro-runtime
-	url = https://github.com/bytecodealliance/wasm-micro-runtime.git
