@@ -1,4 +1,4 @@
-# Copyright 2019 Intel Corporation
+# Copyright 2020 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,12 +14,12 @@
 
 CMAKE_MINIMUM_REQUIRED(VERSION 3.2 FATAL_ERROR)
 
-FILE(GLOB INTERPRETER_TEST_SOURCE *.cpp)
+FILE(GLOB MEM_TEST_CONTRACT_SOURCE *.cpp)
 
 SET(WASM_MODE "$ENV{WASM_MODE}")
 
 IF (WASM_MODE STREQUAL "AOT")
-  BUILD_AOT_CONTRACT(interpreter-test ${INTERPRETER_TEST_SOURCE})
+  BUILD_AOT_CONTRACT(memory-test ${MEM_TEST_CONTRACT_SOURCE})
 ELSE()
-  BUILD_CONTRACT(interpreter-test ${INTERPRETER_TEST_SOURCE})
+  BUILD_CONTRACT(memory-test ${MEM_TEST_CONTRACT_SOURCE})
 ENDIF()

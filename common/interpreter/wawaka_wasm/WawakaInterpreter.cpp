@@ -42,8 +42,14 @@ extern bool RegisterNativeFunctions(void);
 
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+#ifdef AOT_WASM_RT
+const std::string WawakaInterpreter::identity_ = "wawaka-aot";
+#else
 const std::string WawakaInterpreter::identity_ = "wawaka";
+#endif
 
+// TODO: Produce verifiable info about runtime built into this enclave
+// See issue #255
 std::string pdo::contracts::GetInterpreterIdentity(void)
 {
     return WawakaInterpreter::identity_;
@@ -59,8 +65,6 @@ pc::ContractInterpreter* pdo::contracts::CreateInterpreter(void)
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 extern "C" {
 #include "wasm_export.h"
-#include "bh_memory.h"
-#include "bh_common.h"
 
 //#include "sample.h"
 
@@ -90,10 +94,20 @@ void WawakaInterpreter::parse_response_string(
     int32 response_app_beg, response_app_end;
 
     pe::ThrowIf<pe::RuntimeError>(
+        response_app == 0,
+        report_interpreter_error("invalid result pointer", "no response"));
+
+    pe::ThrowIf<pe::RuntimeError>(
         ! wasm_runtime_get_app_addr_range(wasm_module_inst, response_app, &response_app_beg, &response_app_end),
         report_interpreter_error("invalid result pointer", "out of range"));
 
+    pe::ThrowIf<pe::RuntimeError>(
+        response_app_beg == response_app_end,
+        report_interpreter_error("invalid result pointer", "empty response"));
+
     char *result = (char*)wasm_runtime_addr_app_to_native(wasm_module_inst, response_app);
+    pe::ThrowIfNull(result, report_interpreter_error("invalid result pointer", "invalid address"));
+
     const char *result_end = result + (response_app_end - response_app);
 
     // Not the most performant way to do this, but with no assumptions
@@ -128,10 +142,10 @@ void WawakaInterpreter::load_contract_code(
     const std::string& code)
 {
     char error_buf[128];
-    ByteArray binary_code = Base64EncodedStringToByteArray(code);
+    binary_code_ = Base64EncodedStringToByteArray(code);
 
     SAFE_LOG(PDO_LOG_DEBUG, "initialize the wasm interpreter");
-    wasm_module = wasm_runtime_load((uint8*)binary_code.data(), binary_code.size(), error_buf, sizeof(error_buf));
+    wasm_module = wasm_runtime_load((uint8*)binary_code_.data(), binary_code_.size(), error_buf, sizeof(error_buf));
     if (wasm_module == NULL)
         SAFE_LOG(PDO_LOG_CRITICAL, "load failed with error <%s>", error_buf);
 
@@ -152,36 +166,41 @@ int32 WawakaInterpreter::initialize_contract(
 {
     uint8_t* buffer;
     wasm_function_inst_t wasm_func = NULL;
+    int32 result = 0;
 
     SAFE_LOG(PDO_LOG_DEBUG, "wasm initialize_contract");
     wasm_func = wasm_runtime_lookup_function(wasm_module_inst, "_ww_initialize", "(i32)i32");
     pe::ThrowIfNull(wasm_func, "Unable to locate the initialize function");
 
-    // might need to add a null terminator
-    uint32 argv[1], buf_offset;
-    argv[0] = buf_offset = (int32)wasm_runtime_module_malloc(wasm_module_inst, env.length() + 1, (void**)&buffer);
-    if (argv[0] == 0) {
-        SAFE_LOG(PDO_LOG_ERROR, "module malloc failed for some reason");
-        return 0;
+    uint32 argv[1], buf_offset = 0;
+    try {
+        // might need to add a null terminator
+        argv[0] = buf_offset = (int32)wasm_runtime_module_malloc(wasm_module_inst, env.length() + 1, (void**)&buffer);
+        pe::ThrowIf<pe::RuntimeError>(argv[0] == 0,
+                                      "module malloc failed for some reason");
+
+        memcpy(buffer, env.c_str(), env.length());
+        buffer[env.length()] = '\0';
+
+        pe::ThrowIf<pe::RuntimeError>(
+           !wasm_runtime_call_wasm(wasm_exec_env,
+                                   wasm_func, 1, argv),
+           "execution failed for some reason");
+
+        SAFE_LOG(PDO_LOG_DEBUG, "RESULT=%u", argv[0]);
+        result = argv[0];
     }
-
-    memcpy(buffer, env.c_str(), env.length());
-    buffer[env.length()] = '\0';
-
-    if (! wasm_runtime_call_wasm(wasm_exec_env, wasm_func, 1, argv)) {
-        SAFE_LOG(PDO_LOG_ERROR, "execution failed for some reason");
-
+    catch (pe::RuntimeError& e) {
+        SAFE_LOG(PDO_LOG_ERROR, "Exception: %s", e.what());
         const char *exception = wasm_runtime_get_exception(wasm_module_inst);
         if (exception != NULL)
-            SAFE_LOG(PDO_LOG_ERROR, "exception=%s", exception);
-
-        return 0;
+            SAFE_LOG(PDO_LOG_ERROR, "wasm exception = %s", exception);
+        result = 0;
     }
 
-    wasm_runtime_module_free(wasm_module_inst, buf_offset);
-
-    SAFE_LOG(PDO_LOG_DEBUG, "RESULT=%u", argv[0]);
-    return argv[0];
+    if (buf_offset)
+        wasm_runtime_module_free(wasm_module_inst, buf_offset);
+    return result;
 }
 
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
@@ -192,54 +211,60 @@ int32 WawakaInterpreter::evaluate_function(
 {
     uint8_t* buffer;
     wasm_function_inst_t wasm_func = NULL;
+    int32 result = 0;
 
-    SAFE_LOG(PDO_LOG_DEBUG, "evalute_function");
+    SAFE_LOG(PDO_LOG_DEBUG, "evaluate_function");
     pc::validate_invocation_request(args);
 
     wasm_func = wasm_runtime_lookup_function(wasm_module_inst, "_ww_dispatch", "(i32i32)i32");
     pe::ThrowIfNull(wasm_func, "Unable to locate the dispatch function");
 
-    // might need to add a null terminator
-    uint32 argv[2], buf_offset0, buf_offset1;
+    uint32 argv[2], buf_offset0 = 0, buf_offset1 = 0;
+    try {
+        // might need to add a null terminator
+        argv[0] = buf_offset0 = (int32)wasm_runtime_module_malloc(wasm_module_inst, args.length() + 1, (void**)&buffer);
+        pe::ThrowIf<pe::RuntimeError>(argv[0] == 0,
+           "module malloc failed for some reason");
 
-    argv[0] = buf_offset0 = (int32)wasm_runtime_module_malloc(wasm_module_inst, args.length() + 1, (void**)&buffer);
-    if (argv[0] == 0) {
-        SAFE_LOG(PDO_LOG_ERROR, "module malloc failed for some reason");
-        return 0;
+        memcpy(buffer, args.c_str(), args.length());
+        buffer[args.length()] = '\0';
+
+        argv[1] = buf_offset1 = (int32)wasm_runtime_module_malloc(wasm_module_inst, env.length() + 1, (void**)&buffer);
+        pe::ThrowIf<pe::RuntimeError>(argv[1] == 0,
+           "module malloc failed for some reason");
+
+        memcpy(buffer, env.c_str(), env.length());
+        buffer[env.length()] = '\0';
+
+        pe::ThrowIf<pe::RuntimeError>(
+           !wasm_runtime_call_wasm(wasm_exec_env,
+                                   wasm_func, 2, argv),
+           "execution failed for some reason");
+
+        SAFE_LOG(PDO_LOG_DEBUG, "RESULT=%u", argv[0]);
+        result = argv[0];
     }
-
-    memcpy(buffer, args.c_str(), args.length());
-    buffer[args.length()] = '\0';
-
-    argv[1] = buf_offset1 = (int32)wasm_runtime_module_malloc(wasm_module_inst, env.length() + 1, (void**)&buffer);
-    if (argv[1] == 0) {
-        SAFE_LOG(PDO_LOG_ERROR, "module malloc failed for some reason");
-        return 0;
-    }
-
-    memcpy(buffer, env.c_str(), env.length());
-    buffer[env.length()] = '\0';
-
-    if (! wasm_runtime_call_wasm(wasm_exec_env, wasm_func, 2, argv)) {
-        SAFE_LOG(PDO_LOG_ERROR, "execution failed for some reason");
-
+    catch (pe::RuntimeError& e) {
+        SAFE_LOG(PDO_LOG_ERROR, "Exception: %s", e.what());
         const char *exception = wasm_runtime_get_exception(wasm_module_inst);
         if (exception != NULL)
-            SAFE_LOG(PDO_LOG_ERROR, "exception=%s", exception);
-
-        return 0;
+            SAFE_LOG(PDO_LOG_ERROR, "wasm exception = %s", exception);
+        result = 0;
     }
 
-    wasm_runtime_module_free(wasm_module_inst, buf_offset0);
-    wasm_runtime_module_free(wasm_module_inst, buf_offset1);
-
-    SAFE_LOG(PDO_LOG_DEBUG, "RESULT=%u", argv[0]);
-    return argv[0];
+    if (buf_offset0)
+        wasm_runtime_module_free(wasm_module_inst, buf_offset0);
+    if (buf_offset1)
+        wasm_runtime_module_free(wasm_module_inst, buf_offset1);
+    return result;
 }
 
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 void WawakaInterpreter::Finalize(void)
 {
+    // Clear the code buffer
+    binary_code_.clear();
+
     // Destroy the environment
     if (wasm_exec_env != NULL)
     {
@@ -260,7 +285,6 @@ void WawakaInterpreter::Finalize(void)
     }
 
     wasm_runtime_destroy();
-    bh_memory_destroy();
 }
 
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
@@ -272,16 +296,21 @@ WawakaInterpreter::~WawakaInterpreter(void)
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 void WawakaInterpreter::Initialize(void)
 {
-    int result;
+    RuntimeInitArgs init_args;
+    bool result;
 
     SAFE_LOG(PDO_LOG_DEBUG, "initialize wasm interpreter");
 
-    bh_set_print_function(wasm_printer);
+    os_set_print_function(wasm_printer);
 
-    result = bh_memory_init_with_pool(global_heap_buf, sizeof(global_heap_buf));
-    pe::ThrowIf<pe::RuntimeError>(result != 0, "failed to initialize wasm interpreter memory ppol");
+    memset(&init_args, 0, sizeof(RuntimeInitArgs));
 
-    wasm_runtime_init();
+    init_args.mem_alloc_type = Alloc_With_Pool;
+    init_args.mem_alloc_option.pool.heap_buf = global_heap_buf;
+    init_args.mem_alloc_option.pool.heap_size = sizeof(global_heap_buf);
+
+    result = wasm_runtime_full_init(&init_args);
+    pe::ThrowIf<pe::RuntimeError>(! result, "failed to initialize wasm runtime environment");
 
     bool registered = RegisterNativeFunctions();
     pe::ThrowIf<pe::RuntimeError>(! registered, "failed to register native functions");

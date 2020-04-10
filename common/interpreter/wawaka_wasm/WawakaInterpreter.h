@@ -23,8 +23,7 @@
 
 extern "C" {
 #include "wasm_export.h"
-#include "bh_memory.h"
-#include "bh_common.h"
+#include "bh_platform.h"
 }
 
 namespace pc = pdo::contracts;
@@ -39,6 +38,7 @@ private:
     wasm_module_t wasm_module = NULL;
     wasm_module_inst_t wasm_module_inst = NULL;
     wasm_exec_env_t wasm_exec_env = NULL;
+    ByteArray binary_code_;
 
     void parse_response_string(
         int32 response_app,
