@@ -43,8 +43,14 @@ extern bool RegisterNativeFunctions(void);
 
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+#ifdef AOT_WASM_RT
+const std::string WawakaInterpreter::identity_ = "wawaka-aot";
+#else
 const std::string WawakaInterpreter::identity_ = "wawaka";
+#endif
 
+// TODO: Produce verifiable info about runtime built into this enclave
+// See issue #255
 std::string pdo::contracts::GetInterpreterIdentity(void)
 {
     return WawakaInterpreter::identity_;
@@ -137,10 +143,10 @@ void WawakaInterpreter::load_contract_code(
     const std::string& code)
 {
     char error_buf[128];
-    ByteArray binary_code = Base64EncodedStringToByteArray(code);
+    binary_code_ = Base64EncodedStringToByteArray(code);
 
     SAFE_LOG(PDO_LOG_DEBUG, "initialize the wasm interpreter");
-    wasm_module = wasm_runtime_load((uint8*)binary_code.data(), binary_code.size(), error_buf, sizeof(error_buf));
+    wasm_module = wasm_runtime_load((uint8*)binary_code_.data(), binary_code_.size(), error_buf, sizeof(error_buf));
     if (wasm_module == NULL)
         SAFE_LOG(PDO_LOG_CRITICAL, "load failed with error <%s> (errno %d)", error_buf, errno);
 
@@ -208,7 +214,7 @@ int32 WawakaInterpreter::evaluate_function(
     wasm_function_inst_t wasm_func = NULL;
     int32 result = 0;
 
-    SAFE_LOG(PDO_LOG_DEBUG, "evalute_function");
+    SAFE_LOG(PDO_LOG_DEBUG, "evaluate_function");
     pc::validate_invocation_request(args);
 
     wasm_func = wasm_runtime_lookup_function(wasm_module_inst, "_ww_dispatch", "(i32i32)i32");
@@ -257,6 +263,9 @@ int32 WawakaInterpreter::evaluate_function(
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 void WawakaInterpreter::Finalize(void)
 {
+    // Clear the code buffer
+    binary_code_.clear();
+
     // Destroy the environment
     if (wasm_exec_env != NULL)
     {
