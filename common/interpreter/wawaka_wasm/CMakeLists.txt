@@ -23,7 +23,20 @@ IF (NOT EXISTS "$ENV{WASM_SRC}")
   MESSAGE(FATAL_ERROR "WASM_SRC environment variable not defined!")
 ENDIF()
 
+# Make sure wasm-micro-runtime submodule has been cloned
+file(GLOB WAMR_SUBMOD "$ENV{WASM_SRC}")
+list(LENGTH WAMR_SUBMOD SUBMOD_CONTENTS)
+IF (SUBMOD_CONTENTS EQUAL 0)
+  # submodule directory is empty
+  MESSAGE(FATAL_ERROR "WAMR git submodule has not been cloned. Please run `git submodule update --init` first.")
+ENDIF()
+
+IF (NOT DEFINED ENV{WASM_MODE})
+  MESSAGE(FATAL_ERROR "WASM_MODE environment variable not defined!")
+ENDIF()
+
 SET(WASM_SRC "$ENV{WASM_SRC}")
+SET(WASM_MODE "$ENV{WASM_MODE}")
 
 # Reset default linker flags
 set (CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "")
@@ -44,20 +57,30 @@ if (NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif ()
 
-if (NOT DEFINED WAMR_BUILD_INTERP)
-  # Disable Interpreter by default
-  set (WAMR_BUILD_INTERP 0)
-endif ()
-
-if (NOT DEFINED WAMR_BUILD_AOT)
-  # Enable AOT by default.
+IF (WASM_MODE STREQUAL "AOT")
+  # Enable AOT.
   set (WAMR_BUILD_AOT 1)
-endif ()
+  # Disable Interpreter for AoT mode
+  set (WAMR_BUILD_INTERP 0)
+  set (WAMR_BUILD_FAST_INTERP 0)
+  add_definitions (-DAOT_WASM_RT=1)
+  message(STATUS "Building wawaka in AOT mode")
+ELSE ()
+  # Disable AoT by default
+  set (WAMR_BUILD_AOT 0)
+  set (WAMR_BUILD_INTERP 1)
+  if (WASM_MODE STREQUAL "INTERP_OPT")
+    set (WAMR_BUILD_FAST_INTERP 1)
+    message(STATUS "Building wawaka in optimized INTERP mode")
+  else()
+    # Disable optimized interpreter by default
+    set (WAMR_BUILD_FAST_INTERP 0)
+    message(STATUS "Building wawaka in INTERP mode")
+  endif()
+ENDIF()
 
-if (NOT DEFINED WAMR_BUILD_JIT)
-  # Disable JIT by default.
-  set (WAMR_BUILD_JIT 0)
-endif ()
+# Disable JIT by default for all runtime modes.
+set (WAMR_BUILD_JIT 0)
 
 if (NOT DEFINED WAMR_BUILD_LIBC_BUILTIN)
   # Enable libc builtin support by default
@@ -67,11 +90,6 @@ endif ()
 if (NOT DEFINED WAMR_BUILD_LIBC_WASI)
   # Disable libc wasi support by default
   set (WAMR_BUILD_LIBC_WASI 0)
-endif ()
-
-if (NOT DEFINED WAMR_BUILD_FAST_INTERP)
-  # Disable fast interpreter by default
-  set (WAMR_BUILD_FAST_INTERP 0)
 endif ()
 
 SET(PDO_INCLUDE_DIRS ".")
